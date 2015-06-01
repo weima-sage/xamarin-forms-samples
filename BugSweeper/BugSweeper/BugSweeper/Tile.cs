@@ -21,9 +21,7 @@ namespace BugSweeper
         static ImageSource flagImageSource;
         static ImageSource bugImageSource;
         bool doNotFireEvent;
-
         public event EventHandler<TileStatus> TileStatusChanged;
-
         static Tile()
         {
             flagImageSource = ImageSource.FromResource("BugSweeper.Images.Xamarin120.png");
@@ -33,7 +31,7 @@ namespace BugSweeper
         public Tile(int row, int col)
         {
             this.Row = row;
-            this.Col = col; 
+            this.Col = col;
 
             this.BackgroundColor = Color.Yellow;
             this.OutlineColor = Color.Blue;
@@ -51,7 +49,7 @@ namespace BugSweeper
             flagImage = new Image
             {
                 Source = flagImageSource,
-                
+
             };
 
             bugImage = new Image
@@ -67,12 +65,9 @@ namespace BugSweeper
             this.GestureRecognizers.Add(singleTap);
 
 #if FIX_ANDROID_DOUBLE_TAPS
-
             if (Device.OS != TargetPlatform.Android)
             {
-
 #endif
-
                 TapGestureRecognizer doubleTap = new TapGestureRecognizer
                 {
                     NumberOfTapsRequired = 2
@@ -81,22 +76,18 @@ namespace BugSweeper
                 this.GestureRecognizers.Add(doubleTap);
 
 #if FIX_ANDROID_DOUBLE_TAPS
-
             }
-
 #endif
-
         }
-        public int Row { private set; get; }
 
-        public int Col { private set; get; }
+        public int Row {get; }
+        public int Col {get; }
 
         public bool IsBug { set; get; }
-
         public int SurroundingBugCount { set; get; }
 
-        public TileStatus Status 
-        { 
+        public TileStatus Status
+        {
             set
             {
                 if (tileStatus != value)
@@ -107,9 +98,7 @@ namespace BugSweeper
                     {
                         case TileStatus.Hidden:
                             this.Content = null;
-
 #if FIX_WINDOWS_PHONE_NULL_CONTENT
-
                             if (Device.OS == TargetPlatform.WinPhone)
                             {
                                 this.Content = new Label { Text = " " };
@@ -160,17 +149,13 @@ namespace BugSweeper
         }
 
 #if FIX_ANDROID_DOUBLE_TAPS
-
         bool lastTapSingle;
         DateTime lastTapTime;
-
 #endif
 
         void OnSingleTap(object sender, object args)
         {
-
 #if FIX_ANDROID_DOUBLE_TAPS
-
             if (Device.OS == TargetPlatform.Android)
             {
                 if (lastTapSingle && DateTime.Now - lastTapTime < TimeSpan.FromMilliseconds(500))
@@ -184,9 +169,7 @@ namespace BugSweeper
                     lastTapSingle = true;
                 }
             }
-
 #endif
-
             switch (this.Status)
             {
                 case TileStatus.Hidden:
@@ -203,9 +186,23 @@ namespace BugSweeper
             }
         }
 
-        void OnDoubleTap(object sender, object args)
+        void OnDoubleTap(object sender, object args) => Expose();
+        public void Expose() => this.Status = TileStatus.Exposed;
+        public void IncreaseBugCount() => this.SurroundingBugCount++;
+        public bool IsNeibourOf(Tile other)
         {
-            this.Status = TileStatus.Exposed;
+            if (other == null)
+            {
+                return false;
+            }
+            return Math.Abs(other.Row - this.Row) <= 1 &&
+                   Math.Abs(other.Col - this.Col) <= 1 &&
+                   !IsSame(other);
+        }
+
+        public bool IsSame(Tile other)
+        {
+            return other != null && other.Row == this.Row && other.Col == this.Col;
         }
     }
 }

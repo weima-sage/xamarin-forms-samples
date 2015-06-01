@@ -1,4 +1,4 @@
-﻿#define FIX_ANDROID_ANCHORS         // Android AnchorX and AnchorY must be set to 0.5 
+#define FIX_ANDROID_ANCHORS         // Android AnchorX and AnchorY must be set to 0.5
                                     // but can't be set exactly to 0.5
 #define FIX_WINPHONE_BUTTON         // IsEnabled = false doesn't disable button
 
@@ -11,10 +11,9 @@ using Xamarin.Forms;
 
 namespace BugSweeper
 {
-    public partial class BugSweeperPage
+    public partial class BugSweeperPage:ContentPage
     {
         const string timeFormat = @"%m\:ss";
-
         bool isGameInProgress;
         DateTime gameStartTime;
 
@@ -23,6 +22,7 @@ namespace BugSweeper
             InitializeComponent();
 
             board.GameStarted += (sender, args) =>
+
                 {
                     isGameInProgress = true;
                     gameStartTime = DateTime.Now;

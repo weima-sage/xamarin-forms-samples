@@ -1,5 +1,7 @@
-﻿using System;
+using System;
 using Xamarin.Forms;
+using System.Linq;
+using System.Collections.Generic;
 
 namespace BugSweeper
 {
@@ -10,11 +12,12 @@ namespace BugSweeper
         const int ROWS = 9;         // 16
         const int BUGS = 10;        // 40
 
-        Tile[,] tiles = new Tile[ROWS, COLS];
         int flaggedTileCount;
         bool isGameInProgress;              // on first tap
         bool isGameInitialized;             // on first double-tap
         bool isGameEnded;
+
+        private IList<Tile> Tiles { get; } = new List<Tile>();
 
         // Events to notify page.
         public event EventHandler GameStarted;
@@ -22,22 +25,20 @@ namespace BugSweeper
 
         public Board()
         {
-
             for (int row = 0; row < ROWS; row++)
                 for (int col = 0; col < COLS; col++)
                 {
                     Tile tile = new Tile(row, col);
                     tile.TileStatusChanged += OnTileStatusChanged;
                     this.Children.Add(tile);
-                    tiles[row, col] = tile;
+                    Tiles.Add( tile);
                 }
 
             SizeChanged += (sender, args) =>
                 {
                     double tileWidth = this.Width / COLS;
                     double tileHeight = this.Height / ROWS;
-
-                    foreach (Tile tile in tiles)
+                    foreach (Tile tile in Tiles)
                     {
                         Rectangle bounds = new Rectangle(tile.Col * tileWidth,
                                                          tile.Row * tileHeight,
@@ -45,16 +46,16 @@ namespace BugSweeper
                         AbsoluteLayout.SetLayoutBounds(tile, bounds);
                     }
                 };
-
             NewGameInitialize();
         }
+
+        private Tile Tile(int row, int col) => Tiles.Single(t => t.Row == row && t.Col == col);
 
         public void NewGameInitialize()
         {
             // Clear all the tiles.
-            foreach (Tile tile in tiles)
+            foreach (Tile tile in Tiles)
                 tile.Initialize();
-
             isGameInProgress = false;
             isGameInitialized = false;
             isGameEnded = false;
@@ -77,70 +78,53 @@ namespace BugSweeper
             }
         }
 
-        public int BugCount
-        {
-            get
-            {
-                return BUGS;
-            }
-        }
+        public int BugCount => BUGS;
 
-        
         // Not called until the first tile is double-tapped.
         void DefineNewBoard(int tappedRow, int tappedCol)
         {
+            var sourceTile = Tile(tappedRow, tappedCol);
             // Begin the assignment of bugs.
             Random random = new Random();
             int bugCount = 0;
-
             while (bugCount < BUGS)
             {
                 // Get random row and column.
                 int row = random.Next(ROWS);
                 int col = random.Next(COLS);
-
-                // Skip it if it's already a bug.
-                if (tiles[row, col].IsBug)
-                {
-                    continue;
-                }
-
-                // Avoid the tappedRow & Col & surrounding ones.
-                if (row >= tappedRow - 1 &&
-                    row <= tappedRow + 1 &&
-                    col >= tappedCol - 1 &&
-                    col <= tappedCol + 1)
+                var targetTile = Tile(row, col);
+                if (targetTile.IsSame(sourceTile) || targetTile.IsBug || targetTile.IsNeibourOf(sourceTile))
                 {
                     continue;
                 }
 
                 // It's a bug!
-                tiles[row, col].IsBug = true;
-
+                Tile(row, col).IsBug = true;
                 // Calculate the surrounding bug count.
-                CycleThroughNeighbors(row, col,
-                    (neighborRow, neighborCol) =>
-                    {
-                        ++tiles[neighborRow, neighborCol].SurroundingBugCount;
-                    });
-
+                CycleThroughNeighbors(row, col, AddBugToTile);
                 bugCount++;
             }
         }
 
         void CycleThroughNeighbors(int row, int col, Action<int, int> callback)
         {
-            int minRow = Math.Max(0, row - 1);
-            int maxRow = Math.Min(ROWS - 1, row + 1);
-            int minCol = Math.Max(0, col - 1);
-            int maxCol = Math.Min(COLS - 1, col + 1);
+            var neighbors =  from r in GetNeibourIndicesRang( row, ROWS)
+                             from c in GetNeibourIndicesRang( col, COLS)
+                             where r != row || c != col
+                             select Tile(r,c);
 
-            for (int neighborRow = minRow; neighborRow <= maxRow; neighborRow++)
-                for (int neighborCol = minCol; neighborCol <= maxCol; neighborCol++)
-                {
-                    if (neighborRow != row || neighborCol != col)
-                        callback(neighborRow, neighborCol);
-                }
+            foreach(var neighbor in neighbors)
+            {
+                callback(neighbor.Row, neighbor.Col);
+            }
+        }
+
+        private static IEnumerable<int> GetNeibourIndicesRang(int center, int maxIndex)
+        {
+            int min = Math.Max(0, center - 1);
+            int max = Math.Min(maxIndex - 1, center + 1);
+            int count = max - min;
+            return Enumerable.Range(min, count);
         }
 
         void OnTileStatusChanged(object sender, TileStatus tileStatus)
@@ -161,13 +145,7 @@ namespace BugSweeper
             }
 
             // Update the "flagged" bug count before checking for a loss.
-            int flaggedCount = 0;
-
-            foreach (Tile tile in tiles)
-                if (tile.Status == TileStatus.Flagged)
-                    flaggedCount++;
-
-            this.FlaggedTileCount = flaggedCount;
+            this.FlaggedTileCount = Tiles.Where(t => t.Status == TileStatus.Flagged).Count();
 
             // Get the tile whose status has changed.
             Tile changedTile = (Tile)sender;
@@ -197,29 +175,12 @@ namespace BugSweeper
                 // Auto expose for zero surrounding bugs.
                 if (changedTile.SurroundingBugCount == 0)
                 {
-                    CycleThroughNeighbors(changedTile.Row, changedTile.Col,
-                        (neighborRow, neighborCol) =>
-                        {
-                            // Expose all the neighbors.
-                            tiles[neighborRow, neighborCol].Status = TileStatus.Exposed;
-                        });
+                    CycleThroughNeighbors(changedTile.Row, changedTile.Col, ExposeTile);
                 }
             }
 
-            // Check for a win.
-            bool hasWon = true;
-
-            foreach (Tile til in tiles)
-            {
-                if (til.IsBug && til.Status != TileStatus.Flagged)
-                    hasWon = false;
-
-                if (!til.IsBug && til.Status != TileStatus.Exposed)
-                    hasWon = false;
-            }
-
             // If there's a win, celebrate!
-            if (hasWon)
+            if (HasWon)
             {
                 isGameInProgress = false;
                 isGameEnded = true;
@@ -229,8 +190,17 @@ namespace BugSweeper
                 {
                     GameEnded(this, true);
                 }
-                return;
             }
         }
+
+        private bool HasWon => Tiles.All(CorrectlyChecked);
+
+        private void ExposeTile(int row, int col) => Tile(row, col).Expose();
+
+        private void AddBugToTile(int row, int col) => Tile(row, col).IncreaseBugCount();
+
+        private static bool CorrectlyChecked(Tile tile) =>
+                   (tile.IsBug && tile.Status == TileStatus.Flagged) ||
+                   (!tile.IsBug && tile.Status == TileStatus.Exposed);
     }
 }

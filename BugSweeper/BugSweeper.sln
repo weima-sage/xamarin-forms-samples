@@ -215,9 +215,6 @@ Global
 		{96C9E490-7BFD-4E51-AFF2-9E5C411C7D86}.Release|Mixed Platforms.Deploy.0 = Release|iPhone
 		{96C9E490-7BFD-4E51-AFF2-9E5C411C7D86}.Release|x86.ActiveCfg = Release|iPhone
 	EndGlobalSection
-	GlobalSection(MonoDevelopProperties) = preSolution
-		StartupItem = BugSweeper\BugSweeper.iOS\BugSweeper.iOS.csproj
-	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
