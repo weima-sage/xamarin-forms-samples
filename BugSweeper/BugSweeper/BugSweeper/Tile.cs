@@ -3,6 +3,7 @@
 
 using System;
 using Xamarin.Forms;
+using static System.Math;
 
 namespace BugSweeper
 {
@@ -187,22 +188,18 @@ namespace BugSweeper
         }
 
         void OnDoubleTap(object sender, object args) => Expose();
-        public void Expose() => this.Status = TileStatus.Exposed;
-        public void IncreaseBugCount() => this.SurroundingBugCount++;
-        public bool IsNeibourOf(Tile other)
-        {
-            if (other == null)
-            {
-                return false;
-            }
-            return Math.Abs(other.Row - this.Row) <= 1 &&
-                   Math.Abs(other.Col - this.Col) <= 1 &&
-                   !IsSame(other);
-        }
 
-        public bool IsSame(Tile other)
-        {
-            return other != null && other.Row == this.Row && other.Col == this.Col;
-        }
+        public void Expose() => this.Status = TileStatus.Exposed;
+        public bool IsExposed => this.Status == TileStatus.Exposed;
+        public bool IsFlagged => this.Status == TileStatus.Flagged;
+
+        public bool CorrectlyChecked => (IsBug && IsFlagged) || (!IsBug && IsExposed);
+
+        public void IncreaseBugCount() => this.SurroundingBugCount = SurroundingBugCount + 1;
+        
+        public bool IsNeibourOf(Tile other) => other ?. AbsDistanceTo(this) == 1;
+        public bool IsSame(Tile other) => other ?. AbsDistanceTo(this) == 0;
+
+        private int AbsDistanceTo(Tile other) => Abs(other.Row - this.Row) + Abs(other.Col - this.Col);
     }
 }

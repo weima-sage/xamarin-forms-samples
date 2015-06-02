@@ -2,6 +2,7 @@ using System;
 using Xamarin.Forms;
 using System.Linq;
 using System.Collections.Generic;
+using static System.Diagnostics.Debug;
 
 namespace BugSweeper
 {
@@ -100,32 +101,33 @@ namespace BugSweeper
 
                 // It's a bug!
                 Tile(row, col).IsBug = true;
+                var neighbors = GetNeighbors(row, col);
+                WriteLine($"{row}, {col} is bug, neighbors are");
+                foreach(var neighbor in neighbors){
+                    WriteLine($"neibour of {row},{col}: {neighbor.Row}, {neighbor.Col}");
+                }
+
                 // Calculate the surrounding bug count.
-                CycleThroughNeighbors(row, col, AddBugToTile);
+                CycleThroughNeighbors(row, col, AddBugCount);
+                // CycleThroughNeighbors(row, col,
+                //     (neighborRow, neighborCol) =>
+                //     {
+                //         ++(Tile(neighborRow, neighborCol).SurroundingBugCount);
+                //     });
                 bugCount++;
             }
         }
 
         void CycleThroughNeighbors(int row, int col, Action<int, int> callback)
         {
-            var neighbors =  from r in GetNeibourIndicesRang( row, ROWS)
-                             from c in GetNeibourIndicesRang( col, COLS)
-                             where r != row || c != col
-                             select Tile(r,c);
-
-            foreach(var neighbor in neighbors)
+            foreach(var neighbor in GetNeighbors(row, col))
             {
                 callback(neighbor.Row, neighbor.Col);
             }
         }
 
-        private static IEnumerable<int> GetNeibourIndicesRang(int center, int maxIndex)
-        {
-            int min = Math.Max(0, center - 1);
-            int max = Math.Min(maxIndex - 1, center + 1);
-            int count = max - min;
-            return Enumerable.Range(min, count);
-        }
+        private IEnumerable<Tile> GetNeighbors(int row, int col) =>
+            Tiles.Where(t => t.IsNeibourOf(Tile(row, col)));
 
         void OnTileStatusChanged(object sender, TileStatus tileStatus)
         {
@@ -145,7 +147,7 @@ namespace BugSweeper
             }
 
             // Update the "flagged" bug count before checking for a loss.
-            this.FlaggedTileCount = Tiles.Where(t => t.Status == TileStatus.Flagged).Count();
+            this.FlaggedTileCount = Tiles.Count(t => t.IsFlagged);
 
             // Get the tile whose status has changed.
             Tile changedTile = (Tile)sender;
@@ -193,14 +195,10 @@ namespace BugSweeper
             }
         }
 
-        private bool HasWon => Tiles.All(CorrectlyChecked);
+        private bool HasWon => Tiles.All( t => t.CorrectlyChecked);
 
         private void ExposeTile(int row, int col) => Tile(row, col).Expose();
 
-        private void AddBugToTile(int row, int col) => Tile(row, col).IncreaseBugCount();
-
-        private static bool CorrectlyChecked(Tile tile) =>
-                   (tile.IsBug && tile.Status == TileStatus.Flagged) ||
-                   (!tile.IsBug && tile.Status == TileStatus.Exposed);
+        private void AddBugCount(int row, int col) => Tile(row, col).IncreaseBugCount();
     }
 }
