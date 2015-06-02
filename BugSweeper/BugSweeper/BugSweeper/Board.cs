@@ -50,6 +50,12 @@ namespace BugSweeper
             NewGameInitialize();
         }
 
+        private bool HasWon => Tiles.All( t => t.CorrectlyChecked);
+
+        private void ExposeTile(Tile tile) => tile.Expose();
+
+        private void AddBugCount(Tile tile) => tile.IncreaseBugCount();
+
         private Tile Tile(int row, int col) => Tiles.Single(t => t.Row == row && t.Col == col);
 
         public void NewGameInitialize()
@@ -94,40 +100,32 @@ namespace BugSweeper
                 int row = random.Next(ROWS);
                 int col = random.Next(COLS);
                 var targetTile = Tile(row, col);
-                if (targetTile.IsSame(sourceTile) || targetTile.IsBug || targetTile.IsNeibourOf(sourceTile))
+                if(!targetTile.IsNeibourOf(sourceTile) && !targetTile.IsBug && !targetTile.IsSame(sourceTile))
                 {
-                    continue;
+                    // It's a bug!
+                    var buggedTile = CreateBug(row, col);
+                    CycleThroughNeighbors(buggedTile, AddBugCount);
+                    bugCount++;
                 }
-
-                // It's a bug!
-                Tile(row, col).IsBug = true;
-                var neighbors = GetNeighbors(row, col);
-                WriteLine($"{row}, {col} is bug, neighbors are");
-                foreach(var neighbor in neighbors){
-                    WriteLine($"neibour of {row},{col}: {neighbor.Row}, {neighbor.Col}");
-                }
-
-                // Calculate the surrounding bug count.
-                CycleThroughNeighbors(row, col, AddBugCount);
-                // CycleThroughNeighbors(row, col,
-                //     (neighborRow, neighborCol) =>
-                //     {
-                //         ++(Tile(neighborRow, neighborCol).SurroundingBugCount);
-                //     });
-                bugCount++;
             }
         }
 
-        void CycleThroughNeighbors(int row, int col, Action<int, int> callback)
+        Tile CreateBug(int row, int col)
         {
-            foreach(var neighbor in GetNeighbors(row, col))
+            var bugged = Tile(row, col);
+            bugged.IsBug = true;
+            return bugged;
+        }
+
+        void CycleThroughNeighbors(Tile tile, Action<Tile> callback)
+        {
+            foreach(var neighbor in GetNeighbors(tile))
             {
-                callback(neighbor.Row, neighbor.Col);
+                callback(neighbor);
             }
         }
 
-        private IEnumerable<Tile> GetNeighbors(int row, int col) =>
-            Tiles.Where(t => t.IsNeibourOf(Tile(row, col)));
+        private IEnumerable<Tile> GetNeighbors(Tile tile) => Tiles.Where(t => t.IsNeibourOf(tile));
 
         void OnTileStatusChanged(object sender, TileStatus tileStatus)
         {
@@ -177,7 +175,7 @@ namespace BugSweeper
                 // Auto expose for zero surrounding bugs.
                 if (changedTile.SurroundingBugCount == 0)
                 {
-                    CycleThroughNeighbors(changedTile.Row, changedTile.Col, ExposeTile);
+                    CycleThroughNeighbors(changedTile, ExposeTile);
                 }
             }
 
@@ -194,11 +192,5 @@ namespace BugSweeper
                 }
             }
         }
-
-        private bool HasWon => Tiles.All( t => t.CorrectlyChecked);
-
-        private void ExposeTile(int row, int col) => Tile(row, col).Expose();
-
-        private void AddBugCount(int row, int col) => Tile(row, col).IncreaseBugCount();
     }
 }
